@@ -132,6 +132,10 @@ def request(body, token):
             if error.code not in (429,500,502,503,504) or attempt == 3:
                 raise RuntimeError(f'DeepInfra HTTP {error.code}') from None
             time.sleep(2**attempt)
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if attempt == 3:
+                raise
+            time.sleep(2**attempt)
     raise RuntimeError('No valid API response')
 
 
@@ -183,7 +187,19 @@ def run(args):
                    'usage':{k:sum(r['usage'].get(k,0) for t in records for r in t['results'])
                             for k in ('input_tokens','output_tokens')}})
     save(out / 'metrics.json',result)
+    depth_results = {}
+    for depth in (100, 200, 500, 1000):
+        if depth > config['candidate_depth']:
+            continue
+        restricted = {
+            t['qid']:[r['docid'] for r in t['results'] if r['bm25_rank'] <= depth]
+            for t in records
+        }
+        depth_results[str(depth)] = metrics(restricted, {t['qid']:gold[t['qid']] for t in topics})
+    save(out / 'depth-comparison.json', depth_results)
     print(json.dumps(result,indent=2))
+    print('Metrics by original BM25 candidate depth:')
+    print(json.dumps(depth_results,indent=2))
 
 
 def main():
