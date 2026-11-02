@@ -105,3 +105,37 @@ Artifacts are in the experiment output directory, including `comparison.json`
 listing gained/lost queries and candidate-pool failures. API responses and raw
 passages remain local, ignored by Git. Credentials are environment-only and are
 never included in these artifacts.
+
+## Candidate-depth experiment: up to 1,000
+
+Completed dev-100 with the same prompt, passage selection and BM25 rankings,
+using eight workers. Reused the 10,000 top-100 cached responses and scored
+90,000 additional candidates. Evaluating subsets of the scored pool isolates
+candidate depth without changing model decisions for shared candidates.
+
+| BM25 depth | Candidate recall ceiling | DREX R@1 | DREX R@5 | **DREX R@10** |
+|---|---:|---:|---:|---:|
+| 100 | 80% | 48% | 73% | **77%** |
+| 200 | 83% | 45% | 74% | **79%** |
+| 500 | 86% | 45% | 74% | **79%** |
+| 1,000 | 94% | 48% | 80% | **86%** |
+
+- Top-1,000 improves R@10 by **9 percentage points** over top-100 and **28
+  percentage points** over BM25 alone (58%).
+- Relative to top-100 DREX: **11 gained hits, 2 lost hits**.
+- Remaining misses: **6 outside the candidate pool**, **8 inside but below rank 10**.
+- Top-1,000 MRR@10: **0.6137**; nDCG@10: **0.6740**.
+- All 100,000 decisions succeeded eventually. A temporary DNS failure interrupted
+  the initial run after 23 queries; successful calls were cached. The resumed
+  run took **3,914.7 seconds** (~65 minutes), excluding the earlier interrupted
+  segment and preparation. Do not interpret this as total fresh-run runtime.
+- Total token usage for all cached/scored decisions: **146,476,751 input tokens**,
+  **3,610,674 output tokens**. These totals include the reused top-100 responses;
+  they are not incremental usage or a billing statement.
+- Held-out test-100 remains **unevaluated**. All reported results are development
+  results on the same gold-conditioned 1% corpus, not full-corpus CLERC results.
+
+Artifacts: `data/clerc/mini-1pct/experiments/drex-bm25-1000/` contains
+`config.json`, `candidates.jsonl`, `cache/`, `rankings.jsonl`, `metrics.json`,
+`depth-comparison.json`, and `run.log`. The runner automatically produces
+metrics at each available candidate depth. Raw artifacts remain ignored by Git.
